@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Cake Decorator Game — Enhanced Flame & Blow Away Effect</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root{
+      --accent:#6a1b9a;
+      --card:#ffffff;
+      --btn:#e1bee7;
+      --btn-active:#d7a6e0;
+      --shadow:0 10px 30px rgba(0,0,0,0.12);
+      --sidebar-w:320px;
+    }
+
+    html,body{
+      height:100%;
+      margin:0;
+      padding:0;
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+      background: linear-gradient(180deg,#fff7fb 0%, #fff 60%);
+      color:#222;
+      overflow:hidden;
+    }
+
+    body.has-image {
+      background-image: url('bck.png');
+      background-repeat: no-repeat;
+      background-position: center center;
+      background-attachment: fixed;
+      background-size: cover;
+    }
+
+    .app{display:flex;height:100vh;}
+    .sidebar{width:var(--sidebar-w);min-width:260px;padding:18px;background:rgba(255,255,255,0.98);border-right:1px solid rgba(0,0,0,0.04);height:100vh;overflow:auto;transform:translateX(-110%);transition:transform .5s ease;z-index:50;}
+    .sidebar.visible{transform:translateX(0);}
+    .sidebar h2{margin:6px 0 12px;color:var(--accent);}
+    .feedback-card{background:var(--card);border-radius:10px;padding:12px;box-shadow:var(--shadow);}
+    .question{font-weight:700;margin-bottom:10px;}
+    .options{padding:8px;}
+    .opt{display:block;width:calc(100% - 20px);margin:8px 10px;padding:10px 12px;background:var(--btn);border:none;border-radius:8px;cursor:pointer;font-size:14px;text-align:left;box-shadow:0 4px 10px rgba(0,0,0,0.06);color:#3b0b4a;font-weight:600;}
+    .opt:active{background:var(--btn-active);}
+    .main{flex:1;padding:18px;overflow:auto;display:flex;flex-direction:column;align-items:center;}
+    h1{margin:6px 0 12px;color:var(--accent);font-size:26px;}
+
+    #questionBox{width:min(900px,calc(100% - 40px));background:linear-gradient(180deg,rgba(255,255,255,0.98),rgba(249,243,250,0.98));border-radius:12px;padding:14px 16px;box-shadow:var(--shadow);display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:18px;border:1px solid rgba(106,27,154,0.06);}
+    .dialog-left{display:flex;gap:12px;align-items:center;flex:1;}
+    .avatar{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,#ffd1e8,#d1c4e9);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;}
+    .dialog-text p{margin:0;font-weight:700;color:#3b0b4a;font-size:16px;}
+    .dialog-sub{margin-top:6px;font-size:13px;color:#5b4a63;opacity:.95;}
+    .dialog-actions{display:flex;gap:10px;align-items:center;justify-content:flex-end;flex-wrap:wrap;}
+    .dialog-btn{background:var(--btn);border:none;padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:700;color:#3b0b4a;box-shadow:0 6px 18px rgba(0,0,0,0.06);}
+    .dialog-btn:active{background:var(--btn-active);}
+
+    .plate{margin-top:5cm;}
+    .cake{position:relative;margin:0 auto;width:180px;height:220px;}
+    .layer{width:180px;height:50px;border-radius:12px;margin:6px auto;position:relative;display:none;}
+    .frosting{position:absolute;top:0;left:0;width:100%;height:12px;border-radius:12px 12px 0 0;display:none;}
+    .candle{width:18px;height:46px;background:purple;border-radius:4px;position:absolute;top:-62px;transform:translateX(-50%);display:none;}
+
+/* Enhanced flame: two pseudo layers (aura + core) */
+    .candle::before,
+    .candle::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      pointer-events: none;
+      will-change: transform, opacity, filter;
+    }
+
+    .candle::before {
+      /* outer glow / aura */
+      width: 36px;
+      height: 48px;
+      top: -46px;
+      border-radius: 50% 50% 40% 40% / 60% 60% 40% 40%;
+      background: radial-gradient(circle at 40% 30%, rgba(255,230,150,0.95) 0%, rgba(255,160,60,0.55) 30%, rgba(255,90,30,0.18) 60%, rgba(255,90,30,0.06) 100%);
+      filter: blur(6px) saturate(1.05);
+      opacity: 0.95;
+      transform-origin: 50% 80%;
+      animation: flameSway 1200ms infinite ease-in-out;
+      box-shadow: 0 0 18px 6px rgba(255,160,60,0.25), inset 0 -6px 18px rgba(255,200,120,0.08);
+      mix-blend-mode: screen;
+    }
+
+    .candle::after {
+      /* inner core flame */
+      width: 16px;
+      height: 28px;
+      top: -36px;
+      border-radius: 50% 50% 40% 40% / 70% 70% 40% 40%;
+      background: linear-gradient(180deg, #fff9c4 0%, #ffd54f 30%, #ff8a50 60%, #ff7043 100%);
+      transform-origin: 50% 85%;
+      box-shadow: 0 0 8px 2px rgba(255,200,120,0.6);
+      animation: flameFlicker 360ms infinite ease-in-out, flameSway 1200ms infinite ease-in-out;
+      border: 1px solid rgba(255,140,50,0.85);
+    }
+
+    @keyframes flameFlicker {
+      0%   { transform: translateX(-50%) scaleY(1) scaleX(1); opacity: 1; filter: hue-rotate(0deg) brightness(1); }
+      20%  { transform: translateX(-50%) scaleY(1.12) scaleX(0.98); opacity: 0.95; filter: hue-rotate(-2deg) brightness(1.05); }
+      40%  { transform: translateX(-50%) scaleY(0.96) scaleX(1.02); opacity: 0.9; filter: hue-rotate(1deg) brightness(0.98); }
+      60%  { transform: translateX(-50%) scaleY(1.08) scaleX(0.99); opacity: 0.97; filter: hue-rotate(-1deg) brightness(1.03); }
+      80%  { transform: translateX(-50%) scaleY(0.98) scaleX(1.01); opacity: 0.92; filter: hue-rotate(0deg) brightness(0.99); }
+      100% { transform: translateX(-50%) scaleY(1) scaleX(1); opacity: 1; filter: hue-rotate(0deg) brightness(1); }
+    }
+
+    @keyframes flameSway {
+      0%   { transform: translateX(-50%) translateY(0) rotate(-1deg); }
+      25%  { transform: translateX(-48%) translateY(-2px) rotate(1deg); }
+      50%  { transform: translateX(-50%) translateY(0) rotate(0deg); }
+      75%  { transform: translateX(-52%) translateY(-1px) rotate(-1deg); }
+      100% { transform: translateX(-50%) translateY(0) rotate(-1deg); }
+    }
+
+    /* Smoke element (created dynamically) */
+    .smoke {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 40% 40%, rgba(200,200,200,0.95), rgba(160,160,160,0.6));
+      filter: blur(2px);
+      opacity: 0;
+      pointer-events: none;
+      will-change: transform, opacity;
+    }
+
+    /* Popper fragments (flame bits) */
+    .flame-frag {
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      pointer-events: none;
+      will-change: transform, opacity;
+      box-shadow: 0 0 6px rgba(255,160,60,0.9);
+      mix-blend-mode: screen;
+    }
+
+    /* When blown, pause flame animations and fade pseudo elements */
+    .candle.blown::after,
+    .candle.blown::before {
+      animation-play-state: paused;
+      opacity: 0;
+      transition: opacity 900ms ease-out, transform 900ms ease-out, filter 900ms ease-out;
+      filter: blur(2px) saturate(0.6);
+    }
+
+    /* accessibility: reduce motion */
+    @media (prefers-reduced-motion: reduce) {
+      .candle::before, .candle::after, .smoke, .flame-frag { animation: none !important; transition: none !important; }
+    }
+
+    /* overlay for showing sorry.png */
+    .overlay{position:fixed;left:0;top:0;width:100vw;height:100vh;display:flex;align-items:center;justify-content:center;pointer-events:none;background:rgba(0,0,0,0);transition:background .3s ease;z-index:9998;}
+    .overlay.visible{pointer-events:auto;background:rgba(0,0,0,0.6);}
+    .overlay img{max-width:60%;max-height:60%;opacity:0;transition:opacity .3s ease;border-radius:8px;box-shadow:0 12px 40px rgba(0,0,0,0.5);}
+    .overlay.visible img{opacity:1;}
+
+    .toast{margin:10px;padding:10px 12px;background:rgba(0,0,0,0.75);color:#fff;border-radius:8px;font-weight:600;text-align:center;box-shadow:0 6px 18px rgba(0,0,0,0.12);}
+
+    @media (max-width:720px){
+      #questionBox{flex-direction:column;align-items:stretch;padding:12px;}
+      .avatar{width:40px;height:40px;border-radius:8px;}
+      .plate{margin-top:3.5cm;}
+      .sidebar{display:none;}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" id="feedbackSidebar" aria-label="Feedback">
+      <h2>Feedback</h2>
+      <div class="feedback-card" role="region" aria-labelledby="feedbackQ">
+        <div id="feedbackQ" class="question">Are u enjoying it</div>
+        <div class="options" id="optionsArea">
+          <button class="opt" id="opt1" aria-label="Very satisfied">1. Veryy Verryyyyy Muchhh</button>
+          <button class="opt" id="opt2" aria-label="Somewhat satisfied">2. Yessssss a little bitt</button>
+          <button class="opt" id="opt3" aria-label="Neutral">3. Noo, thik thik hi hai bss</button>
+          <button class="opt" id="opt4" aria-label="Not satisfied">4. Bakwas hai blkl hi</button>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main" id="mainContent">
+      <h1>🎂 Cake Decorator Game 🎂</h1>
+      <div id="questionBox" role="dialog" aria-live="polite">
+        <div class="dialog-left">
+          <div class="avatar">CD</div>
+          <div class="dialog-text">
+            <p id="dialogTitle">Welcome — decorate your cake</p>
+            <div class="dialog-sub" id="dialogSub">Choose flavour to begin</div>
+          </div>
+        </div>
+        <div class="dialog-actions" id="dialogActions"></div>
+      </div>
+
+      <div class="plate">
+        <div class="cake" id="cake">
+          <div class="layer" id="layer1"><div class="frosting" id="frosting1"></div></div>
+          <div class="layer" id="layer2"><div class="frosting" id="frosting2"></div></div>
+          <div class="layer" id="layer3"><div class="frosting" id="frosting3"></div></div>
+          <div class="candle" id="candle1" style="left:30%;"></div>
+          <div class="candle" id="candle2" style="left:50%;"></div>
+          <div class="candle" id="candle3" style="left:70%;"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div class="overlay" id="overlay" aria-hidden="true">
+    <img id="overlayImg" alt="Sorry image" src="">
+  </div>
+
+  <script>
+    (function(){
+      const path = 'bck.png';
+      const img = new Image();
+      img.onload = () => document.body.classList.add('has-image');
+      img.src = path;
+    })();
+
+    function showToast(message, duration = 1800){
+      const existing = document.querySelector('.toast');
+      if(existing) existing.remove();
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.textContent = message;
+      document.querySelector('.feedback-card').appendChild(toast);
+      setTimeout(()=> {
+        toast.style.opacity = '0';
+        setTimeout(()=> { if(toast && toast.parentNode) toast.parentNode.removeChild(toast); }, 300);
+      }, duration);
+    }
+
+    // Elements
+    const opt1 = document.getElementById('opt1');
+    const opt2 = document.getElementById('opt2');
+    const opt3 = document.getElementById('opt3');
+    const opt4 = document.getElementById('opt4');
+    const overlay = document.getElementById('overlay');
+    const overlayImg = document.getElementById('overlayImg');
+
+    // URLs to open in the same page
+    const URL_FOR_OPT1 = 'https://example.com';   // replace with desired URL
+    const URL_FOR_OPT2 = 'https://www.mozilla.org'; // replace with desired URL
+
+    // opt1 and opt2: open in the same tab (replace current page)
+    opt1.addEventListener('click', () => { window.location.href = URL_FOR_OPT1; });
+    opt2.addEventListener('click', () => { window.location.href = URL_FOR_OPT2; });
+
+    // opt3 and opt4: show the same sorry.png in overlay
+    function showSorryOverlay() {
+      overlayImg.src = 'sorry.png';
+      overlay.classList.add('visible');
+      overlay.setAttribute('aria-hidden','false');
+      clearTimeout(overlay._hideTimeout);
+      overlay._hideTimeout = setTimeout(()=> {
+        overlay.classList.remove('visible');
+        overlay.setAttribute('aria-hidden','true');
+      }, 2200);
+    }
+    opt3.addEventListener('click', showSorryOverlay);
+    opt4.addEventListener('click', showSorryOverlay);
+    overlay.addEventListener('click', () => {
+      overlay.classList.remove('visible');
+      overlay.setAttribute('aria-hidden','true');
+      clearTimeout(overlay._hideTimeout);
+    });
+
+    // Game flow
+    let step = 1;
+    const dialogTitle = document.getElementById('dialogTitle');
+    const dialogSub = document.getElementById('dialogSub');
+    const dialogActions = document.getElementById('dialogActions');
+    const feedbackSidebar = document.getElementById('feedbackSidebar');
+
+    function renderDialog(){
+      dialogActions.innerHTML = '';
+      if(step === 1){
+        dialogTitle.textContent = 'Which flavour do you like?';
+        dialogSub.textContent = 'Pick one to add cake layers';
+        ['Chocolate','Vanilla','Strawberry','Butterscotch'].forEach(fl=>{
+          const btn = document.createElement('button');
+          btn.className = 'dialog-btn';
+          btn.textContent = fl;
+          btn.onclick = ()=> chooseFlavour(fl.toLowerCase());
+          dialogActions.appendChild(btn);
+        });
+      } else if(step === 2){
+        dialogTitle.textContent = 'Which frosting do you like?';
+        dialogSub.textContent = 'Choose a frosting color';
+        ['Chocolate','Vanilla','Strawberry','Butterscotch'].forEach(fr=>{
+          const btn = document.createElement('button');
+          btn.className = 'dialog-btn';
+          btn.textContent = fr;
+          btn.onclick = ()=> chooseFrosting(fr.toLowerCase());
+          dialogActions.appendChild(btn);
+        });
+      } else if(step === 3){
+        dialogTitle.textContent = 'Which colour candle do you like?';
+        dialogSub.textContent = 'Pick candle color';
+        ['Red','Blue','Green','Yellow'].forEach(c=>{
+          const btn = document.createElement('button');
+          btn.className = 'dialog-btn';
+          btn.textContent = c;
+          btn.onclick = ()=> chooseCandle(c.toLowerCase());
+          dialogActions.appendChild(btn);
+        });
+      } else if(step === 4){
+        dialogTitle.textContent = 'Your cake is ready! 🎉';
+        dialogSub.textContent = 'Almost there...';
+        const ok = document.createElement('button');
+        ok.className = 'dialog-btn';
+        ok.textContent = 'Continue';
+        ok.onclick = ()=> {
+          document.getElementById('candle1').style.display = 'block';
+          document.getElementById('candle2').style.display = 'block';
+          document.getElementById('candle3').style.display = 'block';
+          step = 5; renderDialog();
+        };
+        dialogActions.appendChild(ok);
+      } else if(step === 5){
+        dialogTitle.textContent = 'Are u ready?';
+        dialogSub.textContent = 'Let’s celebrate or come back later';
+        const yes = document.createElement('button');
+        yes.className = 'dialog-btn';
+        yes.id = 'yesBtn';
+        yes.textContent = 'Yes';
+        yes.onclick = ()=> readyAnswer('yes');
+
+        const no = document.createElement('button');
+        no.className = 'dialog-btn';
+        no.id = 'noBtn';
+        no.textContent = 'No';
+        no.onclick = ()=> readyAnswer('no');
+
+        dialogActions.appendChild(yes);
+        dialogActions.appendChild(no);
+      }
+    }
+
+    function chooseFlavour(flavour){
+      const flavourColors = { chocolate:'#5d4037', vanilla:'#fff8e1', strawberry:'#f48fb1', butterscotch:'#ffcc80' };
+      document.getElementById('layer1').style.background = flavourColors[flavour];
+      document.getElementById('layer2').style.background = flavourColors[flavour];
+      document.getElementById('layer3').style.background = flavourColors[flavour];
+      document.getElementById('layer1').style.display = 'block';
+      document.getElementById('layer2').style.display = 'block';
+      document.getElementById('layer3').style.display = 'block';
+      step = 2; renderDialog();
+    }
+
+    function chooseFrosting(frosting){
+      const frostingColors = { chocolate:'#3e2723', vanilla:'#f5f5f5', strawberry:'#f06292', butterscotch:'#ffe0b2' };
+      document.getElementById('frosting1').style.background = frostingColors[frosting];
+      document.getElementById('frosting2').style.background = frostingColors[frosting];
+      document.getElementById('frosting3').style.background = frostingColors[frosting];
+      document.getElementById('frosting1').style.display = 'block';
+      document.getElementById('frosting2').style.display = 'block';
+      document.getElementById('frosting3').style.display = 'block';
+      step = 3; renderDialog();
+    }
+
+    function chooseCandle(color){
+      document.getElementById('candle1').style.background = color;
+      document.getElementById('candle2').style.background = color;
+      document.getElementById('candle3').style.background = color;
+      step = 4; renderDialog();
+    }
+
+    // Blow-away effect implementation
+    function blowAway(candleEl) {
+      if(!candleEl) return;
+      // mark as blown to fade pseudo-elements
+      candleEl.classList.add('blown');
+
+      // compute top center position for fragments and smoke
+      const rect = candleEl.getBoundingClientRect();
+      const rootRect = document.documentElement.getBoundingClientRect();
+      const originX = rect.left + rect.width * 0.5;
+      const originY = rect.top - 20; // slightly above candle top
+
+      // create several small flame fragments that fly upward and outward
+      const fragCount = 8 + Math.floor(Math.random()*6);
+      for(let i=0;i<fragCount;i++){
+        const frag = document.createElement('div');
+        frag.className = 'flame-frag';
+        // random warm color
+        const colors = ['#ffd54f','#ffb74d','#ff8a50','#ff7043','#ffd180'];
+        frag.style.background = colors[Math.floor(Math.random()*colors.length)];
+        // size variation
+        const size = 4 + Math.random()*6;
+        frag.style.width = size + 'px';
+        frag.style.height = size + 'px';
+        // position in viewport coordinates
+        frag.style.left = originX + (Math.random()*6 - 3) + 'px';
+        frag.style.top = originY + (Math.random()*6 - 3) + 'px';
+        document.body.appendChild(frag);
+
+        // animate using Web Animations API for smoother control
+        const dx = (Math.random()*160 - 80);
+        const dy = - (120 + Math.random()*160);
+        const rotate = (Math.random()*720 - 360);
+        const duration = 700 + Math.random()*700;
+
+        const keyframes = [
+          { transform: `translate(0px,0px) rotate(0deg) scale(1)`, opacity: 1, offset: 0 },
+          { transform: `translate(${dx*0.35}px, ${dy*0.35}px) rotate(${rotate*0.25}deg) scale(1.05)`, opacity: 0.95, offset: 0.25 },
+          { transform: `translate(${dx*0.75}px, ${dy*0.75}px) rotate(${rotate*0.6}deg) scale(0.9)`, opacity: 0.6, offset: 0.7 },
+          { transform: `translate(${dx}px, ${dy}px) rotate(${rotate}deg) scale(0.6)`, opacity: 0, offset: 1 }
+        ];
+
+        const anim = frag.animate(keyframes, { duration, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'forwards' });
+        anim.onfinish = () => { if(frag && frag.parentNode) frag.parentNode.removeChild(frag); };
+      }
+
+      // create a few smoke puffs that rise and fade
+      const smokeCount = 3 + Math.floor(Math.random()*3);
+      for(let s=0;s<smokeCount;s++){
+        const smoke = document.createElement('div');
+        smoke.className = 'smoke';
+        const size = 10 + Math.random()*18;
+        smoke.style.width = size + 'px';
+        smoke.style.height = size + 'px';
+        smoke.style.left = originX + (Math.random()*10 - 5) + 'px';
+        smoke.style.top = originY + (Math.random()*6 - 6) + 'px';
+        smoke.style.opacity = '0';
+        smoke.style.transform = `translateX(-50%) translateY(0) scale(${0.8 + Math.random()*0.6})`;
+        document.body.appendChild(smoke);
+
+        const dx = (Math.random()*80 - 40);
+        const dy = - (120 + Math.random()*120);
+        const duration = 900 + Math.random()*900;
+
+        const smokeFrames = [
+          { transform: `translateX(-50%) translateY(0) scale(${0.9})`, opacity: 0, filter: 'blur(2px)', offset: 0 },
+          { transform: `translateX(${dx*0.25}px) translateY(${dy*0.25}px) scale(${1.05})`, opacity: 0.45, filter: 'blur(4px)', offset: 0.25 },
+          { transform: `translateX(${dx*0.6}px) translateY(${dy*0.6}px) scale(${1.25})`, opacity: 0.25, filter: 'blur(6px)', offset: 0.7 },
+          { transform: `translateX(${dx}px) translateY(${dy}px) scale(${1.6})`, opacity: 0, filter: 'blur(8px)', offset: 1 }
+        ];
+
+        const sAnim = smoke.animate(smokeFrames, { duration, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'forwards' });
+        sAnim.onfinish = () => { if(smoke && smoke.parentNode) smoke.parentNode.removeChild(smoke); };
+      }
+
+      // small visual "gust" on the candle body: tilt and fade then hide
+      candleEl.animate([
+        { transform: 'translateX(-50%) rotate(0deg)', opacity: 1 },
+        { transform: 'translateX(-50%) rotate(-6deg) translateY(-6px)', opacity: 0.95 },
+        { transform: 'translateX(-50%) rotate(-12deg) translateY(-12px)', opacity: 0.6 },
+        { transform: 'translateX(-50%) rotate(-18deg) translateY(-18px)', opacity: 0 }
+      ], { duration: 900, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'forwards' });
+
+      // finally hide the candle element after animations
+      setTimeout(()=> {
+        candleEl.style.display = 'none';
+      }, 1000);
+    }
+
+    function readyAnswer(answer){
+      const yesBtn = document.getElementById('yesBtn');
+      const noBtn = document.getElementById('noBtn');
+      if(yesBtn) yesBtn.disabled = true;
+      if(noBtn) noBtn.disabled = true;
+
+      if(answer === 'no'){
+        dialogTitle.textContent = 'Okay, maybe later 😊';
+        dialogSub.textContent = 'We will be here when you are ready';
+        dialogActions.innerHTML = '';
+        setTimeout(()=>{ step = 5; renderDialog(); }, 2500);
+        return;
+      }
+
+      dialogTitle.textContent = 'Woohoo! 🎉';
+      dialogSub.textContent = 'Celebrating...';
+      dialogActions.innerHTML = '';
+
+      spawnPoppers(36);
+      setTimeout(()=> spawnPoppers(18), 350);
+      setTimeout(()=> spawnPoppers(12), 700);
+
+      // instead of only adding 'blown' class, run blowAway for each visible candle
+      setTimeout(()=> {
+        const c1 = document.getElementById('candle1');
+        const c2 = document.getElementById('candle2');
+        const c3 = document.getElementById('candle3');
+        [c1,c2,c3].forEach(c => {
+          if(c && c.style.display !== 'none') blowAway(c);
+        });
+      }, 600);
+
+      setTimeout(()=> { feedbackSidebar.classList.add('visible'); }, 1600);
+    }
+
+    function spawnPoppers(count){
+      const cake = document.getElementById('cake');
+      const cakeRect = cake.getBoundingClientRect();
+      const originX = cakeRect.left + cakeRect.width * 0.5;
+      const originY = cakeRect.top + 10;
+      const colors = ['#ff5252','#ffb74d','#ffd54f','#4db6ac','#81d4fa','#ba68c8','#f06292','#aed581'];
+
+      for(let i=0;i<count;i++){
+        const el = document.createElement('div');
+        el.className = 'popper';
+        const size = Math.floor(Math.random()*10) + 8;
+        el.style.width = size + 'px';
+        el.style.height = size + 'px';
+        el.style.background = colors[Math.floor(Math.random()*colors.length)];
+        el.style.left = (originX + (Math.random()*120 - 60)) + 'px';
+        el.style.top  = (originY + (Math.random()*20 - 10)) + 'px';
+        if(Math.random() < 0.5) el.style.borderRadius = '50%';
+        else el.style.borderRadius = '3px';
+        document.body.appendChild(el);
+
+        const dx = (Math.random()*400 - 200);
+        const dy = (Math.random()*300 + 120);
+        const rotate = (Math.random()*720 - 360);
+        const duration = 1200 + Math.random()*900;
+        const initialRotate = Math.floor(Math.random()*360);
+
+        const keyframes = [
+          { transform: `translate(0px,0px) rotate(${initialRotate}deg) scale(1)`, opacity: 1, offset: 0 },
+          { transform: `translate(${dx*0.35}px, ${-40 + Math.random()*-20}px) rotate(${initialRotate + rotate*0.25}deg) scale(1.05)`, opacity: 1, offset: 0.18 },
+          { transform: `translate(${dx*0.9}px, ${dy*0.45}px) rotate(${initialRotate + rotate*0.6}deg) scale(0.95)`, opacity: 0.95, offset: 0.6 },
+          { transform: `translate(${dx}px, ${dy}px) rotate(${initialRotate + rotate}deg) scale(0.7)`, opacity: 0, offset: 1 }
+        ];
+
+        const anim = el.animate(keyframes, { duration, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'forwards' });
+        anim.onfinish = () => { if(el && el.parentNode) el.parentNode.removeChild(el); };
+      }
+    }
+
+    renderDialog();
+  </script>
+</body>
+</html>
